@@ -1,15 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GraphQL˚ʚ♡ɞ˚</title>
-    <link rel="stylesheet" href="styles.css">
+
+    <link rel="stylesheet" href="styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Mono&display=swap" rel="stylesheet" />
 </head>
+
 <body>
-    <div id="app">
-        <script src="app.js"></script>
-    </div>
-    
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <p id="welcome-text"></p>
+    </header>
+
+    <!-- MAIN AREA -->
+    <main class="main-grid">
+
+        <!-- LEFT SIDE (BIG GRAPH BOX) -->
+        <section class="big-graph-box">
+
+            <div class="section-label">XP Over Time</div>
+            <div class="xp-box" id="xp-graph"></div>
+
+            <div class="small-graphs-row">
+                <div class="subgraph">
+                    <div class="section-label">Pass / Fail Ratio</div>
+                    <div id="passfail-graph"></div>
+                </div>
+
+                <div class="subgraph">
+                    <div class="section-label">Audit Ratio</div>
+                    <div id="audit-graph"></div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- RIGHT SIDEBAR -->
+        <aside class="stats-column">
+
+            <div class="stats-title elven-font">Stats</div>
+
+            <div class="stats-box">
+                <ul id="stats-list"></ul>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- BOTTOM BAR -->
+    <footer class="bottom-strip">
+        <span class="elven-font">End of Scroll</span>
+    </footer>
+
+    <script src="app.js"></script>
 </body>
+
 </html>
