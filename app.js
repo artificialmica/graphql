@@ -1,6 +1,7 @@
 const API_SIGNIN = "https://learn.reboot01.com/api/auth/signin";
 const API_GRAPHQL = "https://learn.reboot01.com/api/graphql-engine/v1/graphql";
 
+
 const USER_QUERY = `
 {
   user {
@@ -43,15 +44,15 @@ async function graphqlRequest(query) {
   });
 
   const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
+  if (json.errors) throw new Error("GraphQL error");
   return json.data;
 }
+
 
 function renderLogin() {
   document.body.innerHTML = `
     <div class="login-container">
       <h1>Login˚ʚ♡ɞ˚</h1>
-
       <label>Username / Email</label>
       <input id="login-id">
 
@@ -67,6 +68,9 @@ function renderLogin() {
   document.getElementById("login-btn").onclick = async () => {
     const id = document.getElementById("login-id").value.trim();
     const pw = document.getElementById("login-password").value;
+    const msg = document.getElementById("login-message");
+
+    msg.textContent = "Signing in...";
 
     try {
       const credentials = btoa(`${id}:${pw}`);
@@ -81,19 +85,17 @@ function renderLogin() {
       const token = await res.json();
       localStorage.setItem("jwt", token);
 
-      location.reload();
+      renderProfile();
     } catch {
-      document.getElementById("login-message").textContent =
-        "Invalid credentials.";
+      msg.textContent = "Login failed.";
     }
   };
 }
 
 
-// --- XP LINE GRAPH ---
 function drawXPGraph(container, points) {
   const width = 900;
-  const height = 250;
+  const height = 260;
   const padding = 40;
 
   if (!points.length) {
@@ -105,8 +107,7 @@ function drawXPGraph(container, points) {
   const maxY = Math.max(...points.map(p => p.y));
 
   const scaleX = (x) => padding + (x / maxX) * (width - padding * 2);
-  const scaleY = (y) =>
-    height - padding - (y / maxY) * (height - padding * 2);
+  const scaleY = (y) => height - padding - (y / maxY) * (height - padding * 2);
 
   let path = "";
   points.forEach((p, i) => {
@@ -117,107 +118,115 @@ function drawXPGraph(container, points) {
 
   container.innerHTML = `
     <svg width="${width}" height="${height}">
-      <path d="${path}"
-        stroke="#d552f4"
-        stroke-width="3"
-        fill="none"
-        stroke-linecap="round"/>
+      <path d="${path}" stroke="#d552f4" stroke-width="3" fill="none" stroke-linecap="round" />
+      <rect id="xp-hover" width="${width}" height="${height}" fill="transparent"></rect>
+      <text id="xp-tip" visibility="hidden" fill="white" font-size="12"></text>
     </svg>
   `;
+
+  const svg = container.querySelector("svg");
+  const hover = container.querySelector("#xp-hover");
+  const tip = container.querySelector("#xp-tip");
+
+  hover.addEventListener("mousemove", (evt) => {
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const cursor = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+    let closest = points[0];
+    let minDist = Infinity;
+    const mouseX = cursor.x;
+
+    points.forEach(p => {
+      const px = scaleX(p.x);
+      const dist = Math.abs(px - mouseX);
+      if (dist < minDist) { closest = p; minDist = dist; }
+    });
+
+    tip.textContent = `${closest.y} XP — ${closest.date}`;
+    let tx = cursor.x + 10;
+    let ty = cursor.y - 10;
+
+    const textWidth = tip.getComputedTextLength();
+    if (tx + textWidth > width - padding) tx = width - padding - textWidth;
+    if (tx < padding) tx = padding;
+    if (ty < padding) ty = padding + 10;
+
+    tip.setAttribute("x", tx);
+    tip.setAttribute("y", ty);
+    tip.setAttribute("visibility", "visible");
+  });
+
+  hover.addEventListener("mouseout", () => {
+    tip.setAttribute("visibility", "hidden");
+  });
 }
 
-// --- PASS/FAIL PIE CHART ---
 function drawPassFailGraph(container, pass, fail) {
   const total = pass + fail || 1;
   const percent = Math.round((pass / total) * 100);
 
   container.innerHTML = `
-    <svg width="200" height="200" viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r="16"
-        stroke="#ffffff55" stroke-width="2" fill="none"/>
-
-      <path d="
-        M 18 2
-        A 16 16 0 ${percent > 50 ? 1 : 0} 1
-        ${18 + 16 * Math.sin(2 * Math.PI * percent / 100)}
-        ${18 - 16 * Math.cos(2 * Math.PI * percent / 100)}
-      "
-      stroke="#e09bff" stroke-width="3" fill="none"/>
-
-      <text x="18" y="22"
-        font-size="10" fill="white" text-anchor="middle">
-        ${percent}%
-      </text>
+    <svg width="300" height="200">
+      <rect x="0" y="80" width="300" height="25" fill="rgba(255,255,255,0.2)" />
+      <rect x="0" y="80" width="${percent * 3}" height="25" fill="#d3a9ff" />
+      <text x="150" y="70" text-anchor="middle" fill="white" font-size="13">Pass Rate</text>
+      <text x="150" y="105" text-anchor="middle" fill="white" font-size="20">${percent}%</text>
     </svg>
   `;
 }
 
-// --- AUDIT BAR ---
-function drawAuditBar(container, ratio) {
-  const r = ratio.toFixed(2);
-  const percent = Math.min((ratio / 2.0) * 100, 100);
+function drawAuditGraph(container, ratio) {
+  const percent = Math.min(ratio / 2.5, 1);  
 
   container.innerHTML = `
-    <div class="audit-wrapper">
-      <div class="audit-track">
-        <div class="audit-fill" style="width:${percent}%"></div>
-      </div>
-      <div class="audit-value">${r}</div>
-    </div>
+    <svg width="300" height="200">
+      <rect x="0" y="80" width="300" height="25" fill="rgba(255,255,255,0.2)" />
+      <rect x="0" y="80" width="${percent * 300}" height="25" fill="#a86bff" />
+      <text x="150" y="70" text-anchor="middle" fill="white" font-size="13">Audit Ratio</text>
+      <text x="150" y="105" text-anchor="middle" fill="white" font-size="20">${ratio.toFixed(2)}</text>
+    </svg>
   `;
 }
 
 async function renderProfile() {
-  const token = localStorage.getItem("jwt");
-  if (!token) return renderLogin();
+  const html = await fetch("index.html").then(res => res.text());
+  document.body.innerHTML = html;
 
-  // HTML structure is already present → do NOT rewrite body
-  const app = document.getElementById("app");
+  const userData = await graphqlRequest(USER_QUERY);
+  const xpData = await graphqlRequest(XP_QUERY);
+  const pfData = await graphqlRequest(PASS_FAIL_QUERY);
 
-  document.getElementById("welcome-text").textContent = "Loading...";
+  const user = userData.user[0];
+  const xp = xpData.transaction;
+  const passCount = pfData.progress.filter(x => x.grade === 1).length;
+  const failCount = pfData.progress.filter(x => x.grade === 0).length;
 
-  try {
-    const userData = await graphqlRequest(USER_QUERY);
-    const xpData = await graphqlRequest(XP_QUERY);
-    const pfData = await graphqlRequest(PASS_FAIL_QUERY);
+  document.getElementById("welcome-text").textContent =
+    `Welcome, ${user.firstName} ${user.lastName}`;
 
-    const user = userData.user[0];
-    const xp = xpData.transaction;
-    const passCount = pfData.progress.filter(p => p.grade === 1).length;
-    const failCount = pfData.progress.filter(p => p.grade === 0).length;
+  const statsList = document.getElementById("stats-list");
+  statsList.innerHTML = `
+    <li><strong>Username:</strong> ${user.login}</li>
+    <li><strong>Email:</strong> ${user.email}</li>
+    <li><strong>Audit Ratio:</strong> ${user.auditRatio.toFixed(2)}</li>
+    <li><strong>Total XP:</strong> ${xp.reduce((a,b)=>a+b.amount,0)}</li>
+    <li><strong>Passes:</strong> ${passCount}</li>
+    <li><strong>Fails:</strong> ${failCount}</li>
+  `;
 
-    // Update welcome bar
-    document.getElementById("welcome-text").textContent =
-      `Welcome, ${user.firstName} ${user.lastName}`;
+  const sortedXP = xp.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
 
-    // Sidebar stats
-    document.getElementById("stats-list").innerHTML = `
-      <li><strong>Username:</strong> ${user.login}</li>
-      <li><strong>Email:</strong> ${user.email}</li>
-      <li><strong>Audit Ratio:</strong> ${user.auditRatio.toFixed(2)}</li>
-      <li><strong>Total XP:</strong> ${
-        xp.reduce((a,b)=>a+b.amount, 0)
-      }</li>
-      <li><strong>Passes:</strong> ${passCount}</li>
-      <li><strong>Fails:</strong> ${failCount}</li>
-    `;
+  const points = sortedXP.map((entry, i) => ({
+    x: i,
+    y: entry.amount,
+    date: new Date(entry.createdAt).toLocaleString()
+  }));
 
-    // XP graph data
-    const sortedXP = xp.sort(
-      (a,b) => new Date(a.createdAt) - new Date(b.createdAt)
-    );
-
-    const points = sortedXP.map((e,i)=>({ x:i, y:e.amount }));
-
-    // Draw graphs
-    drawXPGraph(document.getElementById("xp-graph"), points);
-    drawPassFailGraph(document.getElementById("passfail-graph"), passCount, failCount);
-    drawAuditBar(document.getElementById("audit-graph"), user.auditRatio);
-
-  } catch (err) {
-    console.error(err);
-    renderLogin();
-  }
+  drawXPGraph(document.getElementById("xp-graph"), points);
+  drawPassFailGraph(document.getElementById("passfail-graph"), passCount, failCount);
+  drawAuditGraph(document.getElementById("audit-graph"), user.auditRatio);
 }
 
 if (localStorage.getItem("jwt")) {
