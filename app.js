@@ -165,30 +165,66 @@ function drawXPGraph(container, points) {
 
 function drawPassFailGraph(container, pass, fail) {
   const total = pass + fail || 1;
-  const percent = Math.round((pass / total) * 100);
+  const percent = (pass / total);
+  const angle = percent * 360;
+
+  const radius = 80;
+  const cx = 100;
+  const cy = 100;
+
+  function pointAt(angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return {
+      x: cx + radius * Math.cos(rad),
+      y: cy + radius * Math.sin(rad)
+    };
+  }
+
+  const end = pointAt(angle);
+  const largeArc = angle > 180 ? 1 : 0;
 
   container.innerHTML = `
-    <svg width="300" height="200">
-      <rect x="0" y="80" width="300" height="25" fill="rgba(255,255,255,0.2)" />
-      <rect x="0" y="80" width="${percent * 3}" height="25" fill="#d3a9ff" />
-      <text x="150" y="70" text-anchor="middle" fill="white" font-size="13">Pass Rate</text>
-      <text x="150" y="105" text-anchor="middle" fill="white" font-size="20">${percent}%</text>
+    <svg width="200" height="200">
+
+      <circle
+        cx="${cx}" cy="${cy}" r="${radius}"
+        fill="rgba(255,255,255,0.15)"
+        stroke="white" stroke-width="2"
+      />
+
+      <path d="
+        M ${cx} ${cy - radius}
+        A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}
+        L ${cx} ${cy}
+      "
+      fill="#e09bff" />
+
+      <text
+        x="${cx}" y="${cy + 5}"
+        font-size="22" fill="white"
+        text-anchor="middle"
+      >
+        ${(percent * 100).toFixed(0)}%
+      </text>
     </svg>
   `;
 }
 
 function drawAuditGraph(container, ratio) {
-  const percent = Math.min(ratio / 2.5, 1);  
+  const scaled = Math.min(ratio / 2, 1);   // 2.0 = full bar
+  const percent = Math.round(scaled * 100);
 
   container.innerHTML = `
-    <svg width="300" height="200">
-      <rect x="0" y="80" width="300" height="25" fill="rgba(255,255,255,0.2)" />
-      <rect x="0" y="80" width="${percent * 300}" height="25" fill="#a86bff" />
-      <text x="150" y="70" text-anchor="middle" fill="white" font-size="13">Audit Ratio</text>
-      <text x="150" y="105" text-anchor="middle" fill="white" font-size="20">${ratio.toFixed(2)}</text>
-    </svg>
+    <div class="audit-wrapper">
+      <div class="audit-track">
+        <div class="audit-fill" style="width:${percent}%;"></div>
+      </div>
+
+      <div class="audit-value">${ratio.toFixed(2)}</div>
+    </div>
   `;
 }
+
 
 async function renderProfile() {
   const html = await fetch("index.html").then(res => res.text());
