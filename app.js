@@ -1,12 +1,6 @@
-/* ============================================================
-   API
-============================================================ */
 const API_SIGNIN = "https://learn.reboot01.com/api/auth/signin";
 const API_GRAPHQL = "https://learn.reboot01.com/api/graphql-engine/v1/graphql";
 
-/* ============================================================
-   QUERIES
-============================================================ */
 const USER_QUERY = `
 {
   user {
@@ -36,9 +30,6 @@ const PASS_FAIL_QUERY = `
 }
 `;
 
-/* ============================================================
-   GRAPHQL HELPER
-============================================================ */
 async function graphqlRequest(query) {
   const token = localStorage.getItem("jwt");
 
@@ -52,142 +43,140 @@ async function graphqlRequest(query) {
   });
 
   const json = await res.json();
-  if (json.errors) console.error(json.errors);
-
+  if (json.errors) throw new Error(json.errors[0].message);
   return json.data;
 }
 
-/* ============================================================
-   LOGIN PAGE
-============================================================ */
 function renderLogin() {
   document.body.innerHTML = `
     <div class="login-container">
       <h1>Login˚ʚ♡ɞ˚</h1>
-      <label>Username or Email</label>
+
+      <label>Username / Email</label>
       <input id="login-id">
+
       <label>Password</label>
       <input id="login-password" type="password">
+
       <button id="login-btn">Login</button>
+
       <p id="login-message"></p>
     </div>
   `;
 
-  document.getElementById("login-btn").onclick = login;
+  document.getElementById("login-btn").onclick = async () => {
+    const id = document.getElementById("login-id").value.trim();
+    const pw = document.getElementById("login-password").value;
+
+    try {
+      const credentials = btoa(`${id}:${pw}`);
+
+      const res = await fetch(API_SIGNIN, {
+        method: "POST",
+        headers: { "Authorization": `Basic ${credentials}` }
+      });
+
+      if (!res.ok) throw new Error();
+
+      const token = await res.json();
+      localStorage.setItem("jwt", token);
+
+      location.reload();
+    } catch {
+      document.getElementById("login-message").textContent =
+        "Invalid credentials.";
+    }
+  };
 }
 
-async function login() {
-  const id = document.getElementById("login-id").value.trim();
-  const pw = document.getElementById("login-password").value;
-  const msg = document.getElementById("login-message");
 
-  msg.textContent = "Signing in...";
-
-  try {
-    const credentials = btoa(`${id}:${pw}`);
-    const res = await fetch(API_SIGNIN, {
-      method: "POST",
-      headers: { "Authorization": `Basic ${credentials}` },
-    });
-
-    if (!res.ok) throw new Error();
-
-    const token = await res.json();
-    localStorage.setItem("jwt", token);
-
-    renderProfile();
-  } catch {
-    msg.textContent = "Login failed.";
-  }
-}
-
-/* ============================================================
-   GRAPH FUNCTIONS
-============================================================ */
-
-/* XP LINE GRAPH */
+// --- XP LINE GRAPH ---
 function drawXPGraph(container, points) {
+  const width = 900;
+  const height = 250;
+  const padding = 40;
+
   if (!points.length) {
     container.innerHTML = "<p>No XP yet.</p>";
     return;
   }
 
-  const width = container.clientWidth;
-  const height = container.clientHeight;
-  const padding = 40;
-
   const maxX = points.length - 1;
   const maxY = Math.max(...points.map(p => p.y));
 
-  const scaleX = x => padding + (x / maxX) * (width - padding * 2);
-  const scaleY = y => height - padding - (y / maxY) * (height - padding * 2);
+  const scaleX = (x) => padding + (x / maxX) * (width - padding * 2);
+  const scaleY = (y) =>
+    height - padding - (y / maxY) * (height - padding * 2);
 
   let path = "";
   points.forEach((p, i) => {
     const x = scaleX(p.x);
     const y = scaleY(p.y);
-    path += i === 0 ? `M ${x},${y}` : ` L ${x},${y}`;
+    path += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
 
   container.innerHTML = `
     <svg width="${width}" height="${height}">
       <path d="${path}"
-            stroke="#d9a3ff"
-            stroke-width="3"
-            fill="none"
-            stroke-linecap="round" />
+        stroke="#d552f4"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"/>
     </svg>
   `;
 }
 
-/* PASS/FAIL GRAPH */
+// --- PASS/FAIL PIE CHART ---
 function drawPassFailGraph(container, pass, fail) {
   const total = pass + fail || 1;
   const percent = Math.round((pass / total) * 100);
 
   container.innerHTML = `
     <svg width="200" height="200" viewBox="0 0 36 36">
-      <circle cx="18" cy="18" r="16" stroke="#ffffff55" stroke-width="2" fill="none"/>
+      <circle cx="18" cy="18" r="16"
+        stroke="#ffffff55" stroke-width="2" fill="none"/>
+
       <path d="
         M 18 2
         A 16 16 0 ${percent > 50 ? 1 : 0} 1
         ${18 + 16 * Math.sin(2 * Math.PI * percent / 100)}
         ${18 - 16 * Math.cos(2 * Math.PI * percent / 100)}
-      " stroke="#e9b0ff" stroke-width="3" fill="none"/>
-      <text x="18" y="22" font-size="10" fill="white" text-anchor="middle">${percent}%</text>
+      "
+      stroke="#e09bff" stroke-width="3" fill="none"/>
+
+      <text x="18" y="22"
+        font-size="10" fill="white" text-anchor="middle">
+        ${percent}%
+      </text>
     </svg>
   `;
 }
 
-/* AUDIT RATIO GRAPH (bar) */
+// --- AUDIT BAR ---
 function drawAuditBar(container, ratio) {
-  const value = ratio || 0;
-  const percent = Math.min(Math.max(value / 5, 0), 1); 
-  // audit ratio ranges but we normalize to 0–1 for visual clarity
+  const r = ratio.toFixed(2);
+  const percent = Math.min((ratio / 2.0) * 100, 100);
 
   container.innerHTML = `
     <div class="audit-wrapper">
-      <div class="audit-label">Audit Ratio</div>
-
       <div class="audit-track">
-        <div class="audit-fill" style="width:${percent * 100}%"></div>
+        <div class="audit-fill" style="width:${percent}%"></div>
       </div>
-
-      <div class="audit-value">${value.toFixed(2)}</div>
+      <div class="audit-value">${r}</div>
     </div>
   `;
 }
 
-
-
-/* ============================================================
-   PROFILE PAGE
-============================================================ */
 async function renderProfile() {
-  window.location.reload = () => {}; // prevent reload loop
+  const token = localStorage.getItem("jwt");
+  if (!token) return renderLogin();
+
+  // HTML structure is already present → do NOT rewrite body
+  const app = document.getElementById("app");
+
+  document.getElementById("welcome-text").textContent = "Loading...";
 
   try {
-    /* Fetch data */
     const userData = await graphqlRequest(USER_QUERY);
     const xpData = await graphqlRequest(XP_QUERY);
     const pfData = await graphqlRequest(PASS_FAIL_QUERY);
@@ -197,31 +186,30 @@ async function renderProfile() {
     const passCount = pfData.progress.filter(p => p.grade === 1).length;
     const failCount = pfData.progress.filter(p => p.grade === 0).length;
 
-    /* Insert name */
+    // Update welcome bar
     document.getElementById("welcome-text").textContent =
       `Welcome, ${user.firstName} ${user.lastName}`;
 
-    /* Fill stats */
+    // Sidebar stats
     document.getElementById("stats-list").innerHTML = `
       <li><strong>Username:</strong> ${user.login}</li>
       <li><strong>Email:</strong> ${user.email}</li>
       <li><strong>Audit Ratio:</strong> ${user.auditRatio.toFixed(2)}</li>
-      <li><strong>Total XP:</strong> ${xp.reduce((a,b)=>a+b.amount,0)}</li>
-      <li><strong>Pass:</strong> ${passCount}</li>
-      <li><strong>Fail:</strong> ${failCount}</li>
+      <li><strong>Total XP:</strong> ${
+        xp.reduce((a,b)=>a+b.amount, 0)
+      }</li>
+      <li><strong>Passes:</strong> ${passCount}</li>
+      <li><strong>Fails:</strong> ${failCount}</li>
     `;
 
-    /* XP data formatting */
+    // XP graph data
     const sortedXP = xp.sort(
       (a,b) => new Date(a.createdAt) - new Date(b.createdAt)
     );
 
-    const points = sortedXP.map((entry, i) => ({
-      x: i,
-      y: entry.amount
-    }));
+    const points = sortedXP.map((e,i)=>({ x:i, y:e.amount }));
 
-    /* Draw graphs */
+    // Draw graphs
     drawXPGraph(document.getElementById("xp-graph"), points);
     drawPassFailGraph(document.getElementById("passfail-graph"), passCount, failCount);
     drawAuditBar(document.getElementById("audit-graph"), user.auditRatio);
@@ -232,12 +220,8 @@ async function renderProfile() {
   }
 }
 
-/* ============================================================
-   INIT
-============================================================ */
 if (localStorage.getItem("jwt")) {
-  fetch("index.html")
-    .then(() => renderProfile());
+  renderProfile();
 } else {
   renderLogin();
 }
