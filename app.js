@@ -228,7 +228,7 @@ function drawAuditGraph(container, ratio) {
 
 async function renderProfile() {
   const html = await fetch("index.html").then(res => res.text());
-  document.body.innerHTML = html;
+  // document.body.innerHTML = html; this fucking line ruined everything ffs
 
   const userData = await graphqlRequest(USER_QUERY);
   const xpData = await graphqlRequest(XP_QUERY);
