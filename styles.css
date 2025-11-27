@@ -187,6 +187,11 @@ body {
   color: #ff6347;
 }
 
+.result-grade.in-progress {
+  background: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
 .result-info {
   font-size: 13px;
   flex: 1;

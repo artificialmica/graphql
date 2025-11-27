@@ -36,9 +36,9 @@ const PASS_FAIL_QUERY = `
 `;
 
 // Nested query - demonstrates querying related tables
-const RESULT_QUERY = `
+const PROGRESS_DETAIL_QUERY = `
 {
-  result(limit: 5, order_by: { createdAt: desc }) {
+  progress(limit: 10, order_by: { createdAt: desc }, where: { path: { _is_null: false }}) {
     id
     grade
     createdAt
@@ -416,13 +416,13 @@ async function renderProfile() {
     const userData = await graphqlRequest(USER_QUERY);
     const xpData = await graphqlRequest(XP_QUERY);
     const pfData = await graphqlRequest(PASS_FAIL_QUERY);
-    const resultData = await graphqlRequest(RESULT_QUERY);
+    const progressDetail = await graphqlRequest(PROGRESS_DETAIL_QUERY);
 
     const user = userData.user[0];
     const xp = xpData.transaction;
-    const passCount = pfData.progress.filter(x => x.grade === 1).length;
+    const passCount = pfData.progress.filter(x => x.grade >= 1).length;
     const failCount = pfData.progress.filter(x => x.grade === 0).length;
-    const results = resultData.result || [];
+    const progressResults = progressDetail.progress || [];
 
     // Update welcome text
     document.getElementById("welcome-text").textContent =
@@ -442,12 +442,42 @@ async function renderProfile() {
 
     // Add recent results section (nested query demo)
     const resultsSection = document.getElementById("results-section");
-    if (results.length > 0) {
-      const resultsHTML = results.map(r => {
+    if (progressResults.length > 0) {
+      // Filter to show only the most recent result per project (no duplicates)
+      const projectMap = new Map();
+      progressResults.forEach(r => {
+        const path = r.path || 'unknown';
+        const parts = path.split('/');
+        const projectName = parts[parts.length - 1] || parts[parts.length - 2] || 'Unknown Project';
+        
+        // Only keep the first (most recent) occurrence of each project
+        if (!projectMap.has(projectName)) {
+          projectMap.set(projectName, r);
+        }
+      });
+      
+      const uniqueResults = Array.from(projectMap.values());
+      
+      const resultsHTML = uniqueResults.map(r => {
         // Safety check for nested user data
         const userName = r.user ? r.user.firstName || r.user.login : 'You';
-        const gradeClass = r.grade === 1 ? 'pass' : 'fail';
-        const gradeSymbol = r.grade === 1 ? '✓' : '✗';
+        
+        // Grade logic: >= 1 is pass, 0 is fail, null/undefined is in progress
+        const isPassed = r.grade !== null && r.grade !== undefined && r.grade >= 1;
+        const isFailed = r.grade === 0;
+        const isInProgress = r.grade === null || r.grade === undefined;
+        
+        let gradeClass, gradeSymbol;
+        if (isPassed) {
+          gradeClass = 'pass';
+          gradeSymbol = '✓';
+        } else if (isInProgress) {
+          gradeClass = 'in-progress';
+          gradeSymbol = '⋯';
+        } else {
+          gradeClass = 'fail';
+          gradeSymbol = '✗';
+        }
         
         // Extract project name from path
         const path = r.path || '';
