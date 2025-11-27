@@ -16,13 +16,14 @@
 
         <header class="top-bar">
             <p id="welcome-text"></p>
+            <button id="logout-btn" class="logout-button">Logout</button>
         </header>
 
         <main class="main-grid">
 
             <section class="big-graph-box">
 
-                <div class="section-label">XP Over Time</div>
+                <div class="section-label">XP Over Time (Cumulative)</div>
                 <div class="xp-box">
                     <div id="xp-graph"></div>
                 </div>
@@ -39,6 +40,11 @@
                         <div id="audit-graph"></div>
                     </div>
 
+                </div>
+
+                <div class="section-label" style="margin-top: 20px;">Top Projects by XP</div>
+                <div class="project-box">
+                    <div id="project-graph"></div>
                 </div>
 
             </section>
