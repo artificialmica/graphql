@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphQL˚ʚ♡ɞ˚</title>
+
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Mono&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div id="app">
+
+        <header class="top-bar">
+            <p id="welcome-text"></p>
+            <button id="logout-btn" class="logout-button">Logout</button>
+        </header>
+
+        <main class="main-grid">
+
+            <section class="big-graph-box">
+
+                <div class="section-label">XP Over Time (Cumulative)</div>
+                <div class="xp-box">
+                    <div id="xp-graph"></div>
+                </div>
+
+                <div class="small-graphs-row">
+
+                    <div class="subgraph">
+                        <div class="section-label">Pass / Fail Ratio</div>
+                        <div id="passfail-graph"></div>
+                    </div>
+
+                    <div class="subgraph">
+                        <div class="section-label">Audit Ratio</div>
+                        <div id="audit-graph"></div>
+                    </div>
+
+                </div>
+
+                <div class="section-label" style="margin-top: 20px;">Top Projects by XP</div>
+                <div class="project-box">
+                    <div id="project-graph"></div>
+                </div>
+
+            </section>
+
+            <aside class="stats-column">
+
+                <div class="stats-title">
+                    Stats
+                </div>
+
+                <div class="stats-box">
+                    <ul id="stats-list"></ul>
+                </div>
+
+            </aside>
+
+        </main>
+
+        <footer class="bottom-strip">
+            <span class="elven-font">End of Scroll</span>
+        </footer>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
