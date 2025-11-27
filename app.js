@@ -36,9 +36,9 @@ const PASS_FAIL_QUERY = `
 `;
 
 // Nested query - demonstrates querying related tables
-const RESULT_QUERY = `
+const PROGRESS_DETAIL_QUERY = `
 {
-  result(limit: 5, order_by: { createdAt: desc }) {
+  progress(limit: 10, order_by: { createdAt: desc }, where: { path: { _is_null: false }}) {
     id
     grade
     createdAt
@@ -116,9 +116,12 @@ function renderLogin() {
 }
 
 function drawXPGraph(container, points) {
-  const width = 900;
-  const height = 260;
-  const padding = 40;
+  const width = container.clientWidth || 900;
+  const height = container.clientHeight || 280;
+  const paddingTop = 20;
+  const paddingBottom = 20;
+  const paddingLeft = 5;
+  const paddingRight = 5;
 
   if (!points.length) {
     container.innerHTML = "<p>No XP yet.</p>";
@@ -126,10 +129,21 @@ function drawXPGraph(container, points) {
   }
 
   const maxX = points.length - 1;
-  const maxY = Math.max(...points.map(p => p.y));
+  const allYValues = points.map(p => p.y);
+  const maxY = Math.max(...allYValues);
+  const minY = Math.min(...allYValues);
+  
+  // Add 5% padding to top and bottom for better visualization
+  const yRange = maxY - minY;
+  const yPadding = yRange * 0.05;
+  const displayMinY = Math.max(0, minY - yPadding);
+  const displayMaxY = maxY + yPadding;
 
-  const scaleX = (x) => padding + (x / maxX) * (width - padding * 2);
-  const scaleY = (y) => height - padding - (y / maxY) * (height - padding * 2);
+  const scaleX = (x) => paddingLeft + (x / maxX) * (width - paddingLeft - paddingRight);
+  const scaleY = (y) => {
+    const normalizedY = (y - displayMinY) / (displayMaxY - displayMinY);
+    return height - paddingBottom - normalizedY * (height - paddingTop - paddingBottom);
+  };
 
   let path = "";
   points.forEach((p, i) => {
@@ -139,10 +153,13 @@ function drawXPGraph(container, points) {
   });
 
   container.innerHTML = `
-    <svg width="${width}" height="${height}">
-      <path d="${path}" stroke="#d552f4" stroke-width="3" fill="none" stroke-linecap="round" />
+    <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+      <!-- XP line -->
+      <path d="${path}" stroke="#d552f4" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+      
+      <!-- Interactive hover area -->
       <rect id="xp-hover" width="${width}" height="${height}" fill="transparent"></rect>
-      <text id="xp-tip" visibility="hidden" fill="white" font-size="12"></text>
+      <text id="xp-tip" visibility="hidden" fill="white" font-size="12" font-weight="bold"></text>
     </svg>
   `;
 
@@ -171,9 +188,9 @@ function drawXPGraph(container, points) {
     let ty = cursor.y - 10;
 
     const textWidth = tip.getComputedTextLength();
-    if (tx + textWidth > width - padding) tx = width - padding - textWidth;
-    if (tx < padding) tx = padding;
-    if (ty < padding) ty = padding + 10;
+    if (tx + textWidth > width - paddingRight) tx = width - paddingRight - textWidth;
+    if (tx < paddingLeft) tx = paddingLeft;
+    if (ty < paddingTop + 10) ty = paddingTop + 10;
 
     tip.setAttribute("x", tx);
     tip.setAttribute("y", ty);
@@ -399,13 +416,13 @@ async function renderProfile() {
     const userData = await graphqlRequest(USER_QUERY);
     const xpData = await graphqlRequest(XP_QUERY);
     const pfData = await graphqlRequest(PASS_FAIL_QUERY);
-    const resultData = await graphqlRequest(RESULT_QUERY);
+    const progressDetail = await graphqlRequest(PROGRESS_DETAIL_QUERY);
 
     const user = userData.user[0];
     const xp = xpData.transaction;
-    const passCount = pfData.progress.filter(x => x.grade === 1).length;
+    const passCount = pfData.progress.filter(x => x.grade >= 1).length;
     const failCount = pfData.progress.filter(x => x.grade === 0).length;
-    const results = resultData.result || [];
+    const progressResults = progressDetail.progress || [];
 
     // Update welcome text
     document.getElementById("welcome-text").textContent =
@@ -425,12 +442,42 @@ async function renderProfile() {
 
     // Add recent results section (nested query demo)
     const resultsSection = document.getElementById("results-section");
-    if (results.length > 0) {
-      const resultsHTML = results.map(r => {
+    if (progressResults.length > 0) {
+      // Filter to show only the most recent result per project (no duplicates)
+      const projectMap = new Map();
+      progressResults.forEach(r => {
+        const path = r.path || 'unknown';
+        const parts = path.split('/');
+        const projectName = parts[parts.length - 1] || parts[parts.length - 2] || 'Unknown Project';
+        
+        // Only keep the first (most recent) occurrence of each project
+        if (!projectMap.has(projectName)) {
+          projectMap.set(projectName, r);
+        }
+      });
+      
+      const uniqueResults = Array.from(projectMap.values());
+      
+      const resultsHTML = uniqueResults.map(r => {
         // Safety check for nested user data
         const userName = r.user ? r.user.firstName || r.user.login : 'You';
-        const gradeClass = r.grade === 1 ? 'pass' : 'fail';
-        const gradeSymbol = r.grade === 1 ? '✓' : '✗';
+        
+        // Grade logic: >= 1 is pass, 0 is fail, null/undefined is in progress
+        const isPassed = r.grade !== null && r.grade !== undefined && r.grade >= 1;
+        const isFailed = r.grade === 0;
+        const isInProgress = r.grade === null || r.grade === undefined;
+        
+        let gradeClass, gradeSymbol;
+        if (isPassed) {
+          gradeClass = 'pass';
+          gradeSymbol = '✓';
+        } else if (isInProgress) {
+          gradeClass = 'in-progress';
+          gradeSymbol = '⋯';
+        } else {
+          gradeClass = 'fail';
+          gradeSymbol = '✗';
+        }
         
         // Extract project name from path
         const path = r.path || '';
