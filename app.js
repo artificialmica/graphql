@@ -250,16 +250,34 @@ function drawPassFailGraph(container, pass, fail) {
 }
 
 function drawAuditGraph(container, ratio) {
+  const width = 200;
+  const height = 100;
+  const barHeight = 30;
+  const barY = 35;
+  
+  // Scale ratio to percentage (2.0 = 100%)
   const scaled = Math.min(ratio / 2, 1);
-  const percent = Math.round(scaled * 100);
+  const fillWidth = scaled * (width - 20);
 
   container.innerHTML = `
-    <div class="audit-wrapper">
-      <div class="audit-track">
-        <div class="audit-fill" style="width:${percent}%;"></div>
-      </div>
-      <div class="audit-value">${ratio.toFixed(2)}</div>
-    </div>
+    <svg width="${width}" height="${height}">
+      <!-- Background bar -->
+      <rect x="10" y="${barY}" width="${width - 20}" height="${barHeight}" 
+            fill="rgba(255,255,255,0.25)" rx="5" />
+      
+      <!-- Filled portion -->
+      <rect x="10" y="${barY}" width="${fillWidth}" height="${barHeight}" 
+            fill="#d3a9ff" rx="5">
+        <animate attributeName="width" from="0" to="${fillWidth}" 
+                 dur="0.5s" fill="freeze" />
+      </rect>
+      
+      <!-- Ratio text -->
+      <text x="${width / 2}" y="${barY + barHeight + 20}" 
+            font-size="18" fill="white" text-anchor="middle" font-weight="bold">
+        ${ratio.toFixed(2)}
+      </text>
+    </svg>
   `;
 }
 
