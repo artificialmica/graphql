@@ -250,34 +250,16 @@ function drawPassFailGraph(container, pass, fail) {
 }
 
 function drawAuditGraph(container, ratio) {
-  const width = 200;
-  const height = 100;
-  const barHeight = 30;
-  const barY = 35;
-  
-  // Scale ratio to percentage (2.0 = 100%)
   const scaled = Math.min(ratio / 2, 1);
-  const fillWidth = scaled * (width - 20);
+  const percent = Math.round(scaled * 100);
 
   container.innerHTML = `
-    <svg width="${width}" height="${height}">
-      <!-- Background bar -->
-      <rect x="10" y="${barY}" width="${width - 20}" height="${barHeight}" 
-            fill="rgba(255,255,255,0.25)" rx="5" />
-      
-      <!-- Filled portion -->
-      <rect x="10" y="${barY}" width="${fillWidth}" height="${barHeight}" 
-            fill="#d3a9ff" rx="5">
-        <animate attributeName="width" from="0" to="${fillWidth}" 
-                 dur="0.5s" fill="freeze" />
-      </rect>
-      
-      <!-- Ratio text -->
-      <text x="${width / 2}" y="${barY + barHeight + 20}" 
-            font-size="18" fill="white" text-anchor="middle" font-weight="bold">
-        ${ratio.toFixed(2)}
-      </text>
-    </svg>
+    <div class="audit-wrapper">
+      <div class="audit-track">
+        <div class="audit-fill" style="width:${percent}%;"></div>
+      </div>
+      <div class="audit-value">${ratio.toFixed(2)}</div>
+    </div>
   `;
 }
 
@@ -448,7 +430,30 @@ async function renderProfile() {
 
     // Update stats
     const statsList = document.getElementById("stats-list");
-    const totalXP = xp.reduce((a, b) => a + b.amount, 0);
+    
+    // Filter XP to only include main module (exclude piscine exercises)
+    // The platform typically only counts XP from paths like /bahrain/bh-module/ or /gritlab/div-01/
+    const filteredXP = xp.filter(t => {
+      const path = t.path || '';
+      // Exclude piscine-js and piscine-go exercises (these don't count toward total)
+      if (path.includes('/piscine-js/') || path.includes('/piscine-go/')) {
+        return false;
+      }
+      // Only include paths from main curriculum modules
+      // Adjust this pattern based on your campus (bahrain, gritlab, etc.)
+      return path.includes('/bh-module/') || 
+             path.includes('/div-01/') || 
+             path.includes('/div-02/');
+    });
+    
+    const totalXP = filteredXP.reduce((a, b) => a + b.amount, 0);
+    
+    // Debug: Log to console to verify
+    console.log('All XP transactions:', xp.length);
+    console.log('Filtered XP transactions:', filteredXP.length);
+    console.log('Total XP (filtered):', totalXP);
+    console.log('Sample paths:', xp.slice(0, 10).map(t => t.path));
+    
     statsList.innerHTML = `
       <li><strong>Username:</strong> ${user.login}</li>
       <li><strong>Email:</strong> ${user.email}</li>
@@ -522,8 +527,8 @@ async function renderProfile() {
       resultsSection.innerHTML = '<div class="results-title">No recent results</div>';
     }
 
-    // XP over time graph (cumulative)
-    const sortedXP = xp.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    // XP over time graph (cumulative) - use filtered XP for consistency
+    const sortedXP = filteredXP.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     let cumulativeXP = 0;
     const points = sortedXP.map((entry, i) => {
       cumulativeXP += entry.amount;
