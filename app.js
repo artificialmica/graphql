@@ -25,16 +25,14 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data (filtered to bh-module, sorted oldest first)
+// Query using result table for accurate pass/fail (auditor-given grades only)
 const PASS_FAIL_QUERY = `
 {
-  progress(
-    where: { path: { _ilike: "%bh-module%" } }
-    order_by: { createdAt: asc }
-  ) {
+  result(where: { object: { type: { _eq: "project" } } }) {
     grade
-    path
-    createdAt
+    object {
+      name
+    }
   }
 }
 `;
@@ -413,28 +411,22 @@ async function renderProfile() {
     const xp = xpData.transaction;
     const progressResults = progressDetail.progress || [];
 
-    // Excluded paths - root and exam paths that aren't real projects
-    const excludedPaths = [
-      '/bahrain/bh-module',
-      '/bahrain/bh-module/checkpoint'
-    ];
-
-    // Build project data - track if ever failed and latest grade
+    // Use result table for accurate auditor-given grades
+    // Track if ever failed (auditor gave 0) and best grade per project
     const projectData = {};
-    pfData.progress.forEach(p => {
-      const segments = p.path.split('/').filter(s => s !== '');
-      if (segments.length !== 3) return;
-      if (excludedPaths.includes(p.path)) return;
-
-      if (!projectData[p.path]) {
-        projectData[p.path] = { everFailed: false, latestGrade: null };
+    pfData.result.forEach(p => {
+      const name = p.object.name;
+      if (!projectData[name]) {
+        projectData[name] = { everFailed: false, bestGrade: null };
       }
-      if (p.grade === 0) projectData[p.path].everFailed = true;
-      projectData[p.path].latestGrade = p.grade;
+      if (p.grade === 0) projectData[name].everFailed = true;
+      if (p.grade > (projectData[name].bestGrade || 0)) {
+        projectData[name].bestGrade = p.grade;
+      }
     });
 
     const projects = Object.values(projectData);
-    const passCount = projects.filter(p => p.latestGrade !== null && p.latestGrade >= 1 && !p.everFailed).length;
+    const passCount = projects.filter(p => p.bestGrade >= 1 && !p.everFailed).length;
     const failCount = projects.filter(p => p.everFailed).length;
 
     console.log('Project data:', projectData);
