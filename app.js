@@ -25,12 +25,11 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data (filtered to bh-module projects only, no exercises)
+// Basic query - progress data (filtered to bh-module only)
 const PASS_FAIL_QUERY = `
 {
   progress(where: { 
-    path: { _ilike: "%bh-module%" },
-    object: { type: { _eq: "project" } }
+    path: { _ilike: "%bh-module%" }
   }) {
     grade
     path
@@ -412,9 +411,14 @@ async function renderProfile() {
     const xp = xpData.transaction;
     const progressResults = progressDetail.progress || [];
 
-    // Deduplicate: keep best grade per project path
+    // Deduplicate: keep best grade per path
+    // Only count paths with 3 segments (real projects like /bahrain/bh-module/graphql)
+    // Excludes exercises like /bahrain/bh-module/piscine-js/data/abs (5 segments)
     const bestGrades = {};
     pfData.progress.forEach(p => {
+      const segments = p.path.split('/').filter(s => s !== '');
+      if (segments.length > 3) return;
+
       if (bestGrades[p.path] === undefined || p.grade > bestGrades[p.path]) {
         bestGrades[p.path] = p.grade;
       }
@@ -423,6 +427,10 @@ async function renderProfile() {
     const grades = Object.values(bestGrades);
     const passCount = grades.filter(g => g >= 1).length;
     const failCount = grades.filter(g => g === 0).length;
+
+    console.log('Grades per project:', bestGrades);
+    console.log('Pass count:', passCount);
+    console.log('Fail count:', failCount);
 
     document.getElementById("welcome-text").textContent =
       `Welcome, ${user.firstName} ${user.lastName}`;
@@ -440,12 +448,6 @@ async function renderProfile() {
     });
 
     const totalXP = filteredXP.reduce((a, b) => a + b.amount, 0);
-
-    console.log('All XP transactions:', xp.length);
-    console.log('Filtered XP transactions:', filteredXP.length);
-    console.log('Total XP (filtered):', totalXP);
-    console.log('Pass count:', passCount);
-    console.log('Fail count:', failCount);
 
     statsList.innerHTML = `
       <li><strong>Username:</strong> ${user.login}</li>
