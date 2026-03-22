@@ -25,7 +25,7 @@ const XP_QUERY = `
 }
 `;
 
-// Query using result table for accurate pass/fail (auditor-given grades only)
+// Query using result table for auditor-given grades on projects
 const PASS_FAIL_QUERY = `
 {
   result(where: { object: { type: { _eq: "project" } } }) {
@@ -411,25 +411,10 @@ async function renderProfile() {
     const xp = xpData.transaction;
     const progressResults = progressDetail.progress || [];
 
-    // Use result table for accurate auditor-given grades
-    // Track if ever failed (auditor gave 0) and best grade per project
-    const projectData = {};
-    pfData.result.forEach(p => {
-      const name = p.object.name;
-      if (!projectData[name]) {
-        projectData[name] = { everFailed: false, bestGrade: null };
-      }
-      if (p.grade === 0) projectData[name].everFailed = true;
-      if (p.grade > (projectData[name].bestGrade || 0)) {
-        projectData[name].bestGrade = p.grade;
-      }
-    });
+    // Count every attempt - pass rate out of total submissions
+    const passCount = pfData.result.filter(p => p.grade > 0).length;
+    const failCount = pfData.result.filter(p => p.grade === 0).length;
 
-    const projects = Object.values(projectData);
-    const passCount = projects.filter(p => p.bestGrade >= 1 && !p.everFailed).length;
-    const failCount = projects.filter(p => p.everFailed).length;
-
-    console.log('Project data:', projectData);
     console.log('Pass count:', passCount);
     console.log('Fail count:', failCount);
 
