@@ -423,8 +423,10 @@ async function renderProfile() {
     });
 
     const grades = Object.values(lastGrades);
+    // pass: grade >= 1
+    // fail: grade < 1 (including 0, partial grades like 0.27, and null)
     const passCount = grades.filter(g => g !== null && g >= 1).length;
-    const failCount = grades.filter(g => g !== null && g === 0).length;
+    const failCount = grades.filter(g => g === null || g < 1).length;
 
     console.log('Latest grade per project:', lastGrades);
     console.log('Pass count:', passCount);
