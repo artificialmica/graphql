@@ -25,7 +25,7 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data (filtered to bh-module, sorted oldest first so latest overwrites)
+// Basic query - progress data (filtered to bh-module, sorted oldest first)
 const PASS_FAIL_QUERY = `
 {
   progress(
@@ -413,22 +413,31 @@ async function renderProfile() {
     const xp = xpData.transaction;
     const progressResults = progressDetail.progress || [];
 
-    // Keep latest grade per project path (sorted asc so last write = most recent)
-    // Only count paths with exactly 3 segments e.g. /bahrain/bh-module/graphql
-    const lastGrades = {};
+    // Excluded paths - root and exam paths that aren't real projects
+    const excludedPaths = [
+      '/bahrain/bh-module',
+      '/bahrain/bh-module/checkpoint'
+    ];
+
+    // Build project data - track if ever failed and latest grade
+    const projectData = {};
     pfData.progress.forEach(p => {
       const segments = p.path.split('/').filter(s => s !== '');
       if (segments.length !== 3) return;
-      lastGrades[p.path] = p.grade;
+      if (excludedPaths.includes(p.path)) return;
+
+      if (!projectData[p.path]) {
+        projectData[p.path] = { everFailed: false, latestGrade: null };
+      }
+      if (p.grade === 0) projectData[p.path].everFailed = true;
+      projectData[p.path].latestGrade = p.grade;
     });
 
-    const grades = Object.values(lastGrades);
-    // pass: grade >= 1
-    // fail: grade < 1 (including 0, partial grades like 0.27, and null)
-    const passCount = grades.filter(g => g !== null && g >= 1).length;
-    const failCount = grades.filter(g => g === null || g < 1).length;
+    const projects = Object.values(projectData);
+    const passCount = projects.filter(p => p.latestGrade !== null && p.latestGrade >= 1 && !p.everFailed).length;
+    const failCount = projects.filter(p => p.everFailed).length;
 
-    console.log('Latest grade per project:', lastGrades);
+    console.log('Project data:', projectData);
     console.log('Pass count:', passCount);
     console.log('Fail count:', failCount);
 
