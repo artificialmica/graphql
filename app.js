@@ -25,12 +25,14 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data (filtered to main module only)
+// Basic query - progress data (filtered to bh-module projects only, no exercises)
 const PASS_FAIL_QUERY = `
 {
-  progress(where: { path: { _ilike: "%bh-module%" } }) {
+  progress(where: { 
+    path: { _ilike: "%bh-module%" },
+    object: { type: { _eq: "project" } }
+  }) {
     grade
-    createdAt
     path
   }
 }
@@ -133,7 +135,7 @@ function drawXPGraph(container, points) {
   const allYValues = points.map(p => p.y);
   const maxY = Math.max(...allYValues);
   const minY = Math.min(...allYValues);
-  
+
   const yRange = maxY - minY;
   const yPadding = yRange * 0.05;
   const displayMinY = Math.max(0, minY - yPadding);
@@ -271,11 +273,11 @@ function drawXPByProjectGraph(container, transactions) {
     const path = t.path || "Unknown";
     const parts = path.split('/');
     const projectName = parts[parts.length - 1] || parts[parts.length - 2] || "Unknown";
-    
+
     if (projectName.toLowerCase().includes('deprecated')) {
       return;
     }
-    
+
     if (!pathMap[projectName]) {
       pathMap[projectName] = 0;
     }
@@ -304,7 +306,7 @@ function drawXPByProjectGraph(container, transactions) {
   projectArray.forEach((proj, i) => {
     const y = padding + i * (barHeight + 5);
     const barWidth = (proj.xp / maxXP) * (width - labelWidth - padding * 2);
-    
+
     barsHTML += `
       <g>
         <rect x="${labelWidth}" y="${y}" width="${barWidth}" height="${barHeight}" fill="#9b6bff" />
@@ -408,33 +410,43 @@ async function renderProfile() {
 
     const user = userData.user[0];
     const xp = xpData.transaction;
-    const passCount = pfData.progress.filter(x => x.grade >= 1).length;
-    const failCount = pfData.progress.filter(x => x.grade === 0).length;
     const progressResults = progressDetail.progress || [];
+
+    // Deduplicate: keep best grade per project path
+    const bestGrades = {};
+    pfData.progress.forEach(p => {
+      if (bestGrades[p.path] === undefined || p.grade > bestGrades[p.path]) {
+        bestGrades[p.path] = p.grade;
+      }
+    });
+
+    const grades = Object.values(bestGrades);
+    const passCount = grades.filter(g => g >= 1).length;
+    const failCount = grades.filter(g => g === 0).length;
 
     document.getElementById("welcome-text").textContent =
       `Welcome, ${user.firstName} ${user.lastName}`;
 
     const statsList = document.getElementById("stats-list");
-    
+
     const filteredXP = xp.filter(t => {
       const path = t.path || '';
       if (path.includes('/piscine-js/') || path.includes('/piscine-go/')) {
         return false;
       }
-      return path.includes('/bh-module/') || 
-             path.includes('/div-01/') || 
+      return path.includes('/bh-module/') ||
+             path.includes('/div-01/') ||
              path.includes('/div-02/');
     });
-    
+
     const totalXP = filteredXP.reduce((a, b) => a + b.amount, 0);
-    
+
     console.log('All XP transactions:', xp.length);
     console.log('Filtered XP transactions:', filteredXP.length);
     console.log('Total XP (filtered):', totalXP);
     console.log('Pass count:', passCount);
     console.log('Fail count:', failCount);
-    
+
     statsList.innerHTML = `
       <li><strong>Username:</strong> ${user.login}</li>
       <li><strong>Email:</strong> ${user.email}</li>
@@ -455,14 +467,13 @@ async function renderProfile() {
           projectMap.set(projectName, r);
         }
       });
-      
+
       const uniqueResults = Array.from(projectMap.values());
-      
+
       const resultsHTML = uniqueResults.map(r => {
         const isPassed = r.grade !== null && r.grade !== undefined && r.grade >= 1;
-        const isFailed = r.grade === 0;
         const isInProgress = r.grade === null || r.grade === undefined;
-        
+
         let gradeClass, gradeSymbol;
         if (isPassed) {
           gradeClass = 'pass';
@@ -474,11 +485,11 @@ async function renderProfile() {
           gradeClass = 'fail';
           gradeSymbol = '✗';
         }
-        
+
         const path = r.path || '';
         const parts = path.split('/');
         const projectName = parts[parts.length - 1] || parts[parts.length - 2] || 'Unknown Project';
-        
+
         return `
           <div class="result-item">
             <span class="result-grade ${gradeClass}">
