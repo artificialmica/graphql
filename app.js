@@ -25,12 +25,13 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data
+// Basic query - progress data (filtered to main module only)
 const PASS_FAIL_QUERY = `
 {
-  progress {
+  progress(where: { path: { _ilike: "%bh-module%" } }) {
     grade
     createdAt
+    path
   }
 }
 `;
@@ -133,7 +134,6 @@ function drawXPGraph(container, points) {
   const maxY = Math.max(...allYValues);
   const minY = Math.min(...allYValues);
   
-  // Add 5% padding to top and bottom for better visualization
   const yRange = maxY - minY;
   const yPadding = yRange * 0.05;
   const displayMinY = Math.max(0, minY - yPadding);
@@ -154,10 +154,7 @@ function drawXPGraph(container, points) {
 
   container.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-      <!-- XP line -->
       <path d="${path}" stroke="#d552f4" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-      
-      <!-- Interactive hover area -->
       <rect id="xp-hover" width="${width}" height="${height}" fill="transparent"></rect>
       <text id="xp-tip" visibility="hidden" fill="white" font-size="12" font-weight="bold"></text>
     </svg>
@@ -263,22 +260,18 @@ function drawAuditGraph(container, ratio) {
   `;
 }
 
-// XP by Project/Path Bar Chart
 function drawXPByProjectGraph(container, transactions) {
   if (!transactions.length) {
     container.innerHTML = "<p>No project data.</p>";
     return;
   }
 
-  // Group XP by path (project)
   const pathMap = {};
   transactions.forEach(t => {
     const path = t.path || "Unknown";
-    // Extract project name from path (e.g., "/madere/div-01/graphql" -> "graphql")
     const parts = path.split('/');
     const projectName = parts[parts.length - 1] || parts[parts.length - 2] || "Unknown";
     
-    // Skip deprecated projects
     if (projectName.toLowerCase().includes('deprecated')) {
       return;
     }
@@ -289,11 +282,10 @@ function drawXPByProjectGraph(container, transactions) {
     pathMap[projectName] += t.amount;
   });
 
-  // Convert to array and sort
   const projectArray = Object.entries(pathMap)
     .map(([name, xp]) => ({ name, xp }))
     .sort((a, b) => b.xp - a.xp)
-    .slice(0, 8); // Top 8
+    .slice(0, 8);
 
   if (projectArray.length === 0) {
     container.innerHTML = "<p>No project data available.</p>";
@@ -383,7 +375,6 @@ function loadProfileHTML() {
                 </div>
 
                 <div class="stats-box" id="results-section">
-                    <!-- Recent results will be populated here -->
                 </div>
 
             </aside>
@@ -400,10 +391,8 @@ function loadProfileHTML() {
 
 async function renderProfile() {
   try {
-    // FIRST: Load the profile HTML structure
     loadProfileHTML();
 
-    // Add logout button handler immediately
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
       logoutBtn.onclick = () => {
@@ -412,7 +401,6 @@ async function renderProfile() {
       };
     }
 
-    // THEN: Fetch all data
     const userData = await graphqlRequest(USER_QUERY);
     const xpData = await graphqlRequest(XP_QUERY);
     const pfData = await graphqlRequest(PASS_FAIL_QUERY);
@@ -424,23 +412,16 @@ async function renderProfile() {
     const failCount = pfData.progress.filter(x => x.grade === 0).length;
     const progressResults = progressDetail.progress || [];
 
-    // Update welcome text
     document.getElementById("welcome-text").textContent =
       `Welcome, ${user.firstName} ${user.lastName}`;
 
-    // Update stats
     const statsList = document.getElementById("stats-list");
     
-    // Filter XP to only include main module (exclude piscine exercises)
-    // The platform typically only counts XP from paths like /bahrain/bh-module/ or /gritlab/div-01/
     const filteredXP = xp.filter(t => {
       const path = t.path || '';
-      // Exclude piscine-js and piscine-go exercises (these don't count toward total)
       if (path.includes('/piscine-js/') || path.includes('/piscine-go/')) {
         return false;
       }
-      // Only include paths from main curriculum modules
-      // Adjust this pattern based on your campus (bahrain, gritlab, etc.)
       return path.includes('/bh-module/') || 
              path.includes('/div-01/') || 
              path.includes('/div-02/');
@@ -448,11 +429,11 @@ async function renderProfile() {
     
     const totalXP = filteredXP.reduce((a, b) => a + b.amount, 0);
     
-    // Debug: Log to console to verify
     console.log('All XP transactions:', xp.length);
     console.log('Filtered XP transactions:', filteredXP.length);
     console.log('Total XP (filtered):', totalXP);
-    console.log('Sample paths:', xp.slice(0, 10).map(t => t.path));
+    console.log('Pass count:', passCount);
+    console.log('Fail count:', failCount);
     
     statsList.innerHTML = `
       <li><strong>Username:</strong> ${user.login}</li>
@@ -463,17 +444,13 @@ async function renderProfile() {
       <li><strong>Fails:</strong> ${failCount}</li>
     `;
 
-    // Add recent results section (nested query demo)
     const resultsSection = document.getElementById("results-section");
     if (progressResults.length > 0) {
-      // Filter to show only the most recent result per project (no duplicates)
       const projectMap = new Map();
       progressResults.forEach(r => {
         const path = r.path || 'unknown';
         const parts = path.split('/');
         const projectName = parts[parts.length - 1] || parts[parts.length - 2] || 'Unknown Project';
-        
-        // Only keep the first (most recent) occurrence of each project
         if (!projectMap.has(projectName)) {
           projectMap.set(projectName, r);
         }
@@ -482,10 +459,6 @@ async function renderProfile() {
       const uniqueResults = Array.from(projectMap.values());
       
       const resultsHTML = uniqueResults.map(r => {
-        // Safety check for nested user data
-        const userName = r.user ? r.user.firstName || r.user.login : 'You';
-        
-        // Grade logic: >= 1 is pass, 0 is fail, null/undefined is in progress
         const isPassed = r.grade !== null && r.grade !== undefined && r.grade >= 1;
         const isFailed = r.grade === 0;
         const isInProgress = r.grade === null || r.grade === undefined;
@@ -502,7 +475,6 @@ async function renderProfile() {
           gradeSymbol = '✗';
         }
         
-        // Extract project name from path
         const path = r.path || '';
         const parts = path.split('/');
         const projectName = parts[parts.length - 1] || parts[parts.length - 2] || 'Unknown Project';
@@ -527,7 +499,6 @@ async function renderProfile() {
       resultsSection.innerHTML = '<div class="results-title">No recent results</div>';
     }
 
-    // XP over time graph (cumulative) - use filtered XP for consistency
     const sortedXP = filteredXP.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     let cumulativeXP = 0;
     const points = sortedXP.map((entry, i) => {
@@ -540,19 +511,12 @@ async function renderProfile() {
     });
 
     drawXPGraph(document.getElementById("xp-graph"), points);
-
-    // Pass/Fail ratio graph
     drawPassFailGraph(document.getElementById("passfail-graph"), passCount, failCount);
-
-    // Audit ratio graph
     drawAuditGraph(document.getElementById("audit-graph"), user.auditRatio);
-
-    // XP by Project graph
     drawXPByProjectGraph(document.getElementById("project-graph"), xp);
 
   } catch (err) {
     console.error("Error rendering profile:", err);
-    // If there's an auth error, go back to login
     if (err.message.includes("GraphQL error") || err.message.includes("Unauthorized")) {
       localStorage.removeItem("jwt");
       renderLogin();
@@ -560,7 +524,6 @@ async function renderProfile() {
   }
 }
 
-// Initialize
 if (localStorage.getItem("jwt")) {
   renderProfile();
 } else {
