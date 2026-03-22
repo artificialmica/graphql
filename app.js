@@ -25,14 +25,16 @@ const XP_QUERY = `
 }
 `;
 
-// Basic query - progress data (filtered to bh-module only)
+// Basic query - progress data (filtered to bh-module, sorted oldest first so latest overwrites)
 const PASS_FAIL_QUERY = `
 {
-  progress(where: { 
-    path: { _ilike: "%bh-module%" }
-  }) {
+  progress(
+    where: { path: { _ilike: "%bh-module%" } }
+    order_by: { createdAt: asc }
+  ) {
     grade
     path
+    createdAt
   }
 }
 `;
@@ -411,24 +413,20 @@ async function renderProfile() {
     const xp = xpData.transaction;
     const progressResults = progressDetail.progress || [];
 
-    // Deduplicate: keep best grade per path
-    // Only count paths with 3 segments (real projects like /bahrain/bh-module/graphql)
-    // Excludes exercises like /bahrain/bh-module/piscine-js/data/abs (5 segments)
-    const bestGrades = {};
+    // Keep latest grade per project path (sorted asc so last write = most recent)
+    // Only count paths with exactly 3 segments e.g. /bahrain/bh-module/graphql
+    const lastGrades = {};
     pfData.progress.forEach(p => {
       const segments = p.path.split('/').filter(s => s !== '');
-      if (segments.length > 3) return;
-
-      if (bestGrades[p.path] === undefined || p.grade > bestGrades[p.path]) {
-        bestGrades[p.path] = p.grade;
-      }
+      if (segments.length !== 3) return;
+      lastGrades[p.path] = p.grade;
     });
 
-    const grades = Object.values(bestGrades);
-    const passCount = grades.filter(g => g >= 1).length;
-    const failCount = grades.filter(g => g === 0).length;
+    const grades = Object.values(lastGrades);
+    const passCount = grades.filter(g => g !== null && g >= 1).length;
+    const failCount = grades.filter(g => g !== null && g === 0).length;
 
-    console.log('Grades per project:', bestGrades);
+    console.log('Latest grade per project:', lastGrades);
     console.log('Pass count:', passCount);
     console.log('Fail count:', failCount);
 
